@@ -10,6 +10,7 @@ import (
 type Javascript struct {
 	vm     *otto.Otto
 	script string
+	set    *Config
 }
 
 func init() {
@@ -21,6 +22,8 @@ func NewJavascriptProviderFromConfig(other map[string]interface{}) (IntProvider,
 	var cc struct {
 		VM     string
 		Script string
+		Get    []Config
+		Set    *Config
 	}
 
 	if err := util.DecodeOther(other, &cc); err != nil {
@@ -35,6 +38,7 @@ func NewJavascriptProviderFromConfig(other map[string]interface{}) (IntProvider,
 	p := &Javascript{
 		vm:     vm,
 		script: cc.Script,
+		set:    cc.Set,
 	}
 
 	return p, nil
@@ -97,7 +101,10 @@ func (p *Javascript) paramAndEval(param string, val any) error {
 		err = p.vm.Set("val", val)
 	}
 	if err == nil {
-		_, err = p.vm.Eval(p.script)
+		v, err := p.vm.Eval(p.script)
+		if err == nil && p.set != nil {
+			setTransformed(param, p, v)
+		}
 	}
 	return err
 }
@@ -105,6 +112,13 @@ func (p *Javascript) paramAndEval(param string, val any) error {
 // IntSetter sends int request
 func (p *Javascript) IntSetter(param string) func(int64) error {
 	return func(val int64) error {
+		return p.paramAndEval(param, val)
+	}
+}
+
+// FloatSetter sends int request
+func (p *Javascript) FloatSetter(param string) func(float64) error {
+	return func(val float64) error {
 		return p.paramAndEval(param, val)
 	}
 }
@@ -120,5 +134,34 @@ func (p *Javascript) StringSetter(param string) func(string) error {
 func (p *Javascript) BoolSetter(param string) func(bool) error {
 	return func(val bool) error {
 		return p.paramAndEval(param, val)
+	}
+}
+
+func setTransformed(param string, p *Javascript, v otto.Value) {
+	if v.IsBoolean() {
+		f, err := NewBoolSetterFromConfig(param, *p.set)
+		if err == nil {
+			s, err := v.ToBoolean()
+			if err == nil {
+				err = f(s)
+			}
+		}
+	} else if v.IsNumber() {
+		// TODO: how to detect ints?
+		f, err := NewFloatSetterFromConfig(param, *p.set)
+		if err == nil {
+			s, err := v.ToFloat()
+			if err == nil {
+				err = f(s)
+			}
+		}
+	} else {
+		f, err := NewStringSetterFromConfig(param, *p.set)
+		if err == nil {
+			s, err := v.ToString()
+			if err == nil {
+				err = f(s)
+			}
+		}
 	}
 }
