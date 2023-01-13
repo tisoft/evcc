@@ -58,7 +58,8 @@ func (p *Go) FloatGetter() func() (float64, error) {
 			err = transformGetterGo(p)
 		}
 		if err == nil {
-			v, err := p.vm.Eval(p.script)
+			var v reflect.Value
+			v, err = p.vm.Eval(p.script)
 			if err == nil {
 				if typ := reflect.TypeOf(res); v.CanConvert(typ) {
 					res = v.Convert(typ).Float()
@@ -78,12 +79,15 @@ func (p *Go) IntGetter() func() (int64, error) {
 		if p.transform != nil {
 			err = transformGetterGo(p)
 		}
-		v, err := p.vm.Eval(p.script)
 		if err == nil {
-			if typ := reflect.TypeOf(res); v.CanConvert(typ) {
-				res = v.Convert(typ).Int()
-			} else {
-				err = fmt.Errorf("not an int: %v", v)
+			var v reflect.Value
+			v, err = p.vm.Eval(p.script)
+			if err == nil {
+				if typ := reflect.TypeOf(res); v.CanConvert(typ) {
+					res = v.Convert(typ).Int()
+				} else {
+					err = fmt.Errorf("not an int: %v", v)
+				}
 			}
 		}
 
@@ -98,7 +102,8 @@ func (p *Go) StringGetter() func() (string, error) {
 			err = transformGetterGo(p)
 		}
 		if err == nil {
-			v, err := p.vm.Eval(p.script)
+			var v reflect.Value
+			v, err = p.vm.Eval(p.script)
 			if err == nil {
 				if typ := reflect.TypeOf(res); v.CanConvert(typ) {
 					res = v.Convert(typ).String()
@@ -118,7 +123,8 @@ func (p *Go) BoolGetter() func() (bool, error) {
 			err = transformGetterGo(p)
 		}
 		if err == nil {
-			v, err := p.vm.Eval(p.script)
+			var v reflect.Value
+			v, err = p.vm.Eval(p.script)
 			if err == nil {
 				if typ := reflect.TypeOf(res); v.CanConvert(typ) {
 					res = v.Convert(typ).Bool()
@@ -141,7 +147,8 @@ func (p *Go) paramAndEval(param string, val any) error {
 		_, err = p.vm.Eval(fmt.Sprintf("val := %v;", val))
 	}
 	if err == nil {
-		v, err := p.vm.Eval(p.script)
+		var v reflect.Value
+		v, err = p.vm.Eval(p.script)
 		if err == nil && p.transform != nil {
 			err = transformSetterGo(p.transform, v)
 		}
@@ -187,24 +194,36 @@ func transformGetterGo(p *Go) error {
 				return fmt.Errorf("%s: %w", name, err)
 			}
 			val, err = f()
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
 		} else if cc.Type == "int" {
 			f, err := NewIntGetterFromConfig(cc.Config)
 			if err != nil {
 				return fmt.Errorf("%s: %w", name, err)
 			}
 			val, err = f()
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
 		} else if cc.Type == "float" {
 			f, err := NewFloatGetterFromConfig(cc.Config)
 			if err != nil {
 				return fmt.Errorf("%s: %w", name, err)
 			}
 			val, err = f()
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
 		} else {
 			f, err := NewStringGetterFromConfig(cc.Config)
 			if err != nil {
 				return fmt.Errorf("%s: %w", name, err)
 			}
 			val, err = f()
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
 		}
 		err := p.paramAndEval(name, val)
 		if err != nil {
@@ -226,6 +245,9 @@ func transformSetterGo(transforms []TransformationConfig, v reflect.Value) error
 			} else {
 				err = fmt.Errorf("not a int: %s", v)
 			}
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
 		} else if cc.Type == "int" {
 			f, err := NewIntSetterFromConfig(name, cc.Config)
 			if err != nil {
@@ -235,6 +257,9 @@ func transformSetterGo(transforms []TransformationConfig, v reflect.Value) error
 				err = f(v.Convert(reflect.TypeOf(0)).Int())
 			} else {
 				err = fmt.Errorf("not a int: %s", v)
+			}
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
 			}
 		} else if cc.Type == "float" {
 			f, err := NewFloatSetterFromConfig(name, cc.Config)
@@ -246,6 +271,9 @@ func transformSetterGo(transforms []TransformationConfig, v reflect.Value) error
 			} else {
 				err = fmt.Errorf("not a int: %s", v)
 			}
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
 		} else {
 			f, err := NewStringSetterFromConfig(name, cc.Config)
 			if err != nil {
@@ -255,6 +283,9 @@ func transformSetterGo(transforms []TransformationConfig, v reflect.Value) error
 				err = f(v.Convert(reflect.TypeOf("")).String())
 			} else {
 				err = fmt.Errorf("not a int: %s", v)
+			}
+			if err != nil {
+				return fmt.Errorf("%s: %w", name, err)
 			}
 		}
 	}
