@@ -6,6 +6,8 @@ import (
 
 // provider types
 type (
+	Provider interface {
+	}
 	IntProvider interface {
 		IntGetter() func() (int64, error)
 	}
@@ -32,16 +34,16 @@ type (
 	}
 )
 
-type providerRegistry map[string]func(map[string]interface{}) (IntProvider, error)
+type providerRegistry map[string]func(map[string]interface{}) (Provider, error)
 
-func (r providerRegistry) Add(name string, factory func(map[string]interface{}) (IntProvider, error)) {
+func (r providerRegistry) Add(name string, factory func(map[string]interface{}) (Provider, error)) {
 	if _, exists := r[name]; exists {
 		panic(fmt.Sprintf("cannot register duplicate plugin type: %s", name))
 	}
 	r[name] = factory
 }
 
-func (r providerRegistry) Get(name string) (func(map[string]interface{}) (IntProvider, error), error) {
+func (r providerRegistry) Get(name string) (func(map[string]interface{}) (Provider, error), error) {
 	factory, exists := r[name]
 	if !exists {
 		return nil, fmt.Errorf("invalid plugin source: %s", name)
@@ -49,7 +51,7 @@ func (r providerRegistry) Get(name string) (func(map[string]interface{}) (IntPro
 	return factory, nil
 }
 
-var registry providerRegistry = make(map[string]func(map[string]interface{}) (IntProvider, error))
+var registry providerRegistry = make(map[string]func(map[string]interface{}) (Provider, error))
 
 // Config is the general provider config
 type Config struct {
@@ -61,11 +63,11 @@ type Config struct {
 func NewIntGetterFromConfig(config Config) (res func() (int64, error), err error) {
 	factory, err := registry.Get(config.Source)
 	if err == nil {
-		var provider IntProvider
+		var provider Provider
 		provider, err = factory(config.Other)
 
-		if err == nil {
-			res = provider.IntGetter()
+		if prov, ok := provider.(IntProvider); ok {
+			res = prov.IntGetter()
 		}
 	}
 
@@ -80,7 +82,7 @@ func NewIntGetterFromConfig(config Config) (res func() (int64, error), err error
 func NewFloatGetterFromConfig(config Config) (res func() (float64, error), err error) {
 	factory, err := registry.Get(config.Source)
 	if err == nil {
-		var provider IntProvider
+		var provider Provider
 		provider, err = factory(config.Other)
 
 		if prov, ok := provider.(FloatProvider); ok {
@@ -102,10 +104,10 @@ func NewStringGetterFromConfig(config Config) (res func() (string, error), err e
 		res, err = NewOpenWBStatusProviderFromConfig(config.Other)
 
 	default:
-		var factory func(map[string]interface{}) (IntProvider, error)
+		var factory func(map[string]interface{}) (Provider, error)
 		factory, err = registry.Get(typ)
 		if err == nil {
-			var provider IntProvider
+			var provider Provider
 			provider, err = factory(config.Other)
 
 			if prov, ok := provider.(StringProvider); ok {
@@ -125,7 +127,7 @@ func NewStringGetterFromConfig(config Config) (res func() (string, error), err e
 func NewBoolGetterFromConfig(config Config) (res func() (bool, error), err error) {
 	factory, err := registry.Get(config.Source)
 	if err == nil {
-		var provider IntProvider
+		var provider Provider
 		provider, err = factory(config.Other)
 
 		if prov, ok := provider.(BoolProvider); ok {
@@ -144,7 +146,7 @@ func NewBoolGetterFromConfig(config Config) (res func() (bool, error), err error
 func NewIntSetterFromConfig(param string, config Config) (res func(int64) error, err error) {
 	factory, err := registry.Get(config.Source)
 	if err == nil {
-		var provider IntProvider
+		var provider Provider
 		provider, err = factory(config.Other)
 
 		if prov, ok := provider.(SetIntProvider); ok {
@@ -163,7 +165,7 @@ func NewIntSetterFromConfig(param string, config Config) (res func(int64) error,
 func NewFloatSetterFromConfig(param string, config Config) (res func(float64) error, err error) {
 	factory, err := registry.Get(config.Source)
 	if err == nil {
-		var provider IntProvider
+		var provider Provider
 		provider, err = factory(config.Other)
 
 		if prov, ok := provider.(SetFloatProvider); ok {
@@ -182,7 +184,7 @@ func NewFloatSetterFromConfig(param string, config Config) (res func(float64) er
 func NewBoolSetterFromConfig(param string, config Config) (res func(bool) error, err error) {
 	factory, err := registry.Get(config.Source)
 	if err == nil {
-		var provider IntProvider
+		var provider Provider
 		provider, err = factory(config.Other)
 
 		if prov, ok := provider.(SetBoolProvider); ok {
@@ -201,7 +203,7 @@ func NewBoolSetterFromConfig(param string, config Config) (res func(bool) error,
 func NewStringSetterFromConfig(param string, config Config) (res func(string) error, err error) {
 	factory, err := registry.Get(config.Source)
 	if err == nil {
-		var provider IntProvider
+		var provider Provider
 		provider, err = factory(config.Other)
 
 		if prov, ok := provider.(SetStringProvider); ok {
