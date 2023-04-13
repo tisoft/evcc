@@ -9,9 +9,10 @@ import (
 
 // Javascript implements Javascript request provider
 type Javascript struct {
-	vm        *otto.Otto
-	script    string
-	transform []TransformationConfig
+	vm     *otto.Otto
+	script string
+	read   []TransformationConfig
+	write  []TransformationConfig
 }
 
 type TransformationConfig struct {
@@ -26,9 +27,10 @@ func init() {
 // NewJavascriptProviderFromConfig creates a Javascript provider
 func NewJavascriptProviderFromConfig(other map[string]interface{}) (Provider, error) {
 	var cc struct {
-		VM        string
-		Script    string
-		Transform []TransformationConfig
+		VM     string
+		Script string
+		Read   []TransformationConfig
+		Write  []TransformationConfig
 	}
 
 	if err := util.DecodeOther(other, &cc); err != nil {
@@ -41,9 +43,10 @@ func NewJavascriptProviderFromConfig(other map[string]interface{}) (Provider, er
 	}
 
 	p := &Javascript{
-		vm:        vm,
-		script:    cc.Script,
-		transform: cc.Transform,
+		vm:     vm,
+		script: cc.Script,
+		read:   cc.Read,
+		write:  cc.Write,
 	}
 
 	return p, nil
@@ -52,7 +55,7 @@ func NewJavascriptProviderFromConfig(other map[string]interface{}) (Provider, er
 // FloatGetter parses float from request
 func (p *Javascript) FloatGetter() func() (float64, error) {
 	return func() (res float64, err error) {
-		if p.transform != nil {
+		if p.read != nil {
 			err = transformGetter(p)
 		}
 		if err == nil {
@@ -69,7 +72,7 @@ func (p *Javascript) FloatGetter() func() (float64, error) {
 // IntGetter parses int64 from request
 func (p *Javascript) IntGetter() func() (int64, error) {
 	return func() (res int64, err error) {
-		if p.transform != nil {
+		if p.read != nil {
 			err = transformGetter(p)
 		}
 		if err == nil {
@@ -87,7 +90,7 @@ func (p *Javascript) IntGetter() func() (int64, error) {
 // StringGetter parses string from request
 func (p *Javascript) StringGetter() func() (string, error) {
 	return func() (res string, err error) {
-		if p.transform != nil {
+		if p.read != nil {
 			err = transformGetter(p)
 		}
 		if err == nil {
@@ -105,7 +108,7 @@ func (p *Javascript) StringGetter() func() (string, error) {
 // BoolGetter parses bool from request
 func (p *Javascript) BoolGetter() func() (bool, error) {
 	return func() (res bool, err error) {
-		if p.transform != nil {
+		if p.read != nil {
 			err = transformGetter(p)
 		}
 		if err == nil {
@@ -131,7 +134,7 @@ func (p *Javascript) paramAndEval(param string, val any) error {
 	if err == nil {
 		var v otto.Value
 		v, err = p.vm.Eval(p.script)
-		if err == nil && p.transform != nil {
+		if err == nil && p.write != nil {
 			err = transformSetter(p, v)
 		}
 	}
@@ -167,7 +170,7 @@ func (p *Javascript) BoolSetter(param string) func(bool) error {
 }
 
 func transformGetter(p *Javascript) error {
-	for _, cc := range p.transform {
+	for _, cc := range p.read {
 		name := cc.Name
 		var val any
 		if cc.Type == "bool" {
@@ -216,7 +219,7 @@ func transformGetter(p *Javascript) error {
 }
 
 func transformSetter(p *Javascript, v otto.Value) error {
-	for _, cc := range p.transform {
+	for _, cc := range p.write {
 		name := cc.Name
 		if cc.Type == "bool" {
 			f, err := NewBoolSetterFromConfig(name, cc.Config)

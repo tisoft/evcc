@@ -11,9 +11,10 @@ import (
 
 // Go implements Go request provider
 type Go struct {
-	vm        *interp.Interpreter
-	script    string
-	transform []TransformationConfig
+	vm     *interp.Interpreter
+	script string
+	read   []TransformationConfig
+	write  []TransformationConfig
 }
 
 //type TransformationConfig struct {
@@ -28,9 +29,10 @@ func init() {
 // NewGoProviderFromConfig creates a Go provider
 func NewGoProviderFromConfig(other map[string]interface{}) (Provider, error) {
 	var cc struct {
-		VM        string
-		Script    string
-		Transform []TransformationConfig
+		VM     string
+		Script string
+		Read   []TransformationConfig
+		Write  []TransformationConfig
 	}
 
 	if err := util.DecodeOther(other, &cc); err != nil {
@@ -43,9 +45,10 @@ func NewGoProviderFromConfig(other map[string]interface{}) (Provider, error) {
 	}
 
 	p := &Go{
-		vm:        vm,
-		script:    cc.Script,
-		transform: cc.Transform,
+		vm:     vm,
+		script: cc.Script,
+		read:   cc.Read,
+		write:  cc.Write,
 	}
 
 	return p, nil
@@ -54,7 +57,7 @@ func NewGoProviderFromConfig(other map[string]interface{}) (Provider, error) {
 // FloatGetter parses float from request
 func (p *Go) FloatGetter() func() (float64, error) {
 	return func() (res float64, err error) {
-		if p.transform != nil {
+		if p.read != nil {
 			err = transformGetterGo(p)
 		}
 		if err == nil {
@@ -76,7 +79,7 @@ func (p *Go) FloatGetter() func() (float64, error) {
 func (p *Go) IntGetter() func() (int64, error) {
 	return func() (res int64, err error) {
 
-		if p.transform != nil {
+		if p.read != nil {
 			err = transformGetterGo(p)
 		}
 		if err == nil {
@@ -98,7 +101,7 @@ func (p *Go) IntGetter() func() (int64, error) {
 // StringGetter parses string from request
 func (p *Go) StringGetter() func() (string, error) {
 	return func() (res string, err error) {
-		if p.transform != nil {
+		if p.read != nil {
 			err = transformGetterGo(p)
 		}
 		if err == nil {
@@ -119,7 +122,7 @@ func (p *Go) StringGetter() func() (string, error) {
 // BoolGetter parses bool from request
 func (p *Go) BoolGetter() func() (bool, error) {
 	return func() (res bool, err error) {
-		if p.transform != nil {
+		if p.read != nil {
 			err = transformGetterGo(p)
 		}
 		if err == nil {
@@ -149,8 +152,8 @@ func (p *Go) paramAndEval(param string, val any) error {
 	if err == nil {
 		var v reflect.Value
 		v, err = p.vm.Eval(p.script)
-		if err == nil && p.transform != nil {
-			err = transformSetterGo(p.transform, v)
+		if err == nil && p.write != nil {
+			err = transformSetterGo(p.write, v)
 		}
 	}
 	return err
@@ -185,7 +188,7 @@ func (p *Go) BoolSetter(param string) func(bool) error {
 }
 
 func transformGetterGo(p *Go) error {
-	for _, cc := range p.transform {
+	for _, cc := range p.read {
 		name := cc.Name
 		var val any
 		if cc.Type == "bool" {
